@@ -126,7 +126,7 @@ export default function HeroSection({
           <motion.button
             className="px-8 py-4 bg-white text-primary-900 font-semibold rounded-lg shadow-lg hover:bg-primary-50 transition-colors duration-200 focus:outline-none focus:ring-4 focus:ring-primary-300"
             onClick={onCtaClick}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyPress}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}

@@ -70,7 +70,7 @@ describe('HeroSection', () => {
     );
     
     const button = screen.getByRole('button');
-    fireEvent.keyPress(button, { key: 'Enter' });
+    fireEvent.keyDown(button, { key: 'Enter' });
     expect(handleClick).toHaveBeenCalled();
   });
 
