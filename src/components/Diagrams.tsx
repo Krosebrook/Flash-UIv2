@@ -47,7 +47,7 @@ function DiagramSkeleton({ title }: { title?: string }) {
 /**
  * Error boundary fallback for diagram loading errors
  */
-function DiagramError({ title }: { title?: string }) {
+export function DiagramError({ title }: { title?: string }) {
   return (
     <div 
       className="w-full h-96 bg-red-50 rounded-lg flex items-center justify-center"
@@ -84,6 +84,7 @@ function LazyDiagram({ type, title, description, onVisible }: LazyDiagramProps) 
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    const currentRef = ref.current;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -99,13 +100,13 @@ function LazyDiagram({ type, title, description, onVisible }: LazyDiagramProps) 
       }
     );
 
-    if (ref.current) {
-      observer.observe(ref.current);
+    if (currentRef) {
+      observer.observe(currentRef);
     }
 
     return () => {
-      if (ref.current) {
-        observer.unobserve(ref.current);
+      if (currentRef) {
+        observer.unobserve(currentRef);
       }
     };
   }, [isVisible, onVisible]);

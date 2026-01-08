@@ -70,7 +70,7 @@ class LRUCache implements CacheAdapter {
  * Redis Cache implementation (optional)
  */
 class RedisCache implements CacheAdapter {
-  private client: any | null = null;
+  private client: unknown | null = null;
 
   constructor() {
     this.initializeClient();
@@ -96,7 +96,7 @@ class RedisCache implements CacheAdapter {
         },
       });
 
-      await this.client.connect();
+      await (this.client as InstanceType<typeof Redis>).connect();
       logger.info('Redis cache connected');
     } catch (error) {
       logger.warn('Redis initialization failed, using LRU cache', { error });
@@ -110,7 +110,7 @@ class RedisCache implements CacheAdapter {
     }
 
     try {
-      return await this.client.get(key);
+      return await (this.client as import('ioredis').Redis).get(key);
     } catch (error) {
       logger.error('Redis get error', { error });
       return null;
@@ -123,7 +123,7 @@ class RedisCache implements CacheAdapter {
     }
 
     try {
-      await this.client.setex(key, ttl, value);
+      await (this.client as import('ioredis').Redis).setex(key, ttl, value);
     } catch (error) {
       logger.error('Redis set error', { error });
     }
@@ -135,7 +135,7 @@ class RedisCache implements CacheAdapter {
     }
 
     try {
-      await this.client.del(key);
+      await (this.client as import('ioredis').Redis).del(key);
     } catch (error) {
       logger.error('Redis delete error', { error });
     }
@@ -147,7 +147,7 @@ class RedisCache implements CacheAdapter {
     }
 
     try {
-      await this.client.flushdb();
+      await (this.client as import('ioredis').Redis).flushdb();
     } catch (error) {
       logger.error('Redis clear error', { error });
     }

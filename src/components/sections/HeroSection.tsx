@@ -48,8 +48,8 @@ export default function HeroSection({
   const scale = useTransform(smoothProgress, [0, 1], [1, 1.1]);
 
   // Throttled scroll handler for additional custom logic
-  const handleScroll = useCallback(
-    throttle(() => {
+  const handleScroll = useMemo(
+    () => throttle(() => {
       if (!containerRef.current) return;
       
       const rect = containerRef.current.getBoundingClientRect();

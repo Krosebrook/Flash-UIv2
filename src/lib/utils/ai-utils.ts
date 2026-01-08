@@ -2,7 +2,7 @@
  * Utility functions for AI operations
  */
 
-import { AIRequest, AIMessage } from '@/types/ai';
+import { AIRequest } from '@/types/ai';
 import crypto from 'crypto';
 
 /**
@@ -103,7 +103,7 @@ export function sanitizeOutput(output: string): string {
  * Calculate cost estimate for tokens (USD)
  */
 export function estimateCost(
-  provider: 'openai' | 'anthropic',
+  _provider: 'openai' | 'anthropic',
   model: string,
   promptTokens: number,
   completionTokens: number
