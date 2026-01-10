@@ -20,7 +20,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
     {
         name: "Standard",
         css: "",
-        previewHtml: `<div class="preview-box standard"><span>No Layout</span></div>`
+        previewHtml: `<div class="preview-box standard"><div class="std-nav"></div><div class="std-hero"></div><div class="std-grid"><div class="std-item"></div><div class="std-item"></div><div class="std-item"></div></div></div>`
     },
     {
         name: "Hero Center",
@@ -32,7 +32,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .layout-container { width: 100%; max-width: 800px; animation: floatUp 0.8s ease-out; }
             @keyframes floatUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         `,
-        previewHtml: `<div class="preview-box hero"><div class="hero-content"></div></div>`
+        previewHtml: `<div class="preview-box hero"><div class="hero-bg-glow"></div><div class="hero-card"><div class="hero-title"></div><div class="hero-subtitle"></div><div class="hero-button"></div></div></div>`
     },
     {
         name: "Glassmorphism",
@@ -49,7 +49,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
                 box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
             }
         `,
-        previewHtml: `<div class="preview-box glass"><div class="glass-pane"></div></div>`
+        previewHtml: `<div class="preview-box glass"><div class="glass-blob one"></div><div class="glass-blob two"></div><div class="glass-card"><div class="glass-shine"></div></div></div>`
     },
     {
         name: "Mobile Frame",
@@ -65,7 +65,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             }
             .layout-container::-webkit-scrollbar { display: none; }
         `,
-        previewHtml: `<div class="preview-box mobile"><div class="notch"></div><div class="screen"></div></div>`
+        previewHtml: `<div class="preview-box mobile"><div class="mobile-shell"><div class="mobile-screen"><div class="mobile-app-header"></div><div class="mobile-app-body"><div class="mobile-row"></div><div class="mobile-row"></div></div></div></div></div>`
     },
     {
         name: "Bento Grid",
@@ -74,7 +74,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .layout-container { grid-column: span 2; background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
             .side-bento { background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: #888; font-weight: 500; }
         `,
-        previewHtml: `<div class="preview-box bento"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>`
+        previewHtml: `<div class="preview-box bento"><div class="bento-item main"></div><div class="bento-item side-top"></div><div class="bento-item side-bottom"></div></div>`
     },
     {
         name: "SaaS Dashboard",
@@ -85,7 +85,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .main-content { padding: 60px; background: #fafafa; display: flex; flex-direction: column; align-items: flex-start; }
             .layout-container { width: 100%; max-width: 900px; background: #fff; border-radius: 12px; border: 1px solid #eee; padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         `,
-        previewHtml: `<div class="preview-box saas"><div class="side-nav"><div class="nav-line"></div></div><div class="main-area"><div class="content-block"></div></div></div>`
+        previewHtml: `<div class="preview-box saas"><div class="saas-nav"></div><div class="saas-body"><div class="saas-header-bar"></div><div class="saas-content-grid"><div class="saas-widget lg"></div><div class="saas-widget sm"></div></div></div></div>`
     },
     {
         name: "Neo-Brutalist",
@@ -96,7 +96,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
                 box-shadow: 12px 12px 0px #000;
             }
         `,
-        previewHtml: `<div class="preview-box brutal"><div class="brutal-box"></div></div>`
+        previewHtml: `<div class="preview-box brutal"><div class="brutal-bg-pattern"></div><div class="brutal-container"><div class="brutal-title">HOVER</div></div></div>`
     },
     {
         name: "Split Screen",
@@ -106,6 +106,6 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .content-side { flex: 1.2; padding: 80px; display: flex; align-items: center; justify-content: center; background: #fff; }
             .layout-container { width: 100%; max-width: 500px; }
         `,
-        previewHtml: `<div class="preview-box split"><div class="v1"></div><div class="v2"></div></div>`
+        previewHtml: `<div class="preview-box split"><div class="split-image-side"></div><div class="split-text-side"><div class="split-line"></div><div class="split-line short"></div><div class="split-btn"></div></div></div>`
     }
 ];

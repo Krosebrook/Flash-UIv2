@@ -581,75 +581,88 @@ html, body {
     background: #09090b; color: #fff;
 }
 
-/* Expand Button on Cards */
-.expand-btn {
-    position: absolute; top: 12px; right: 12px; z-index: 10;
-    width: 32px; height: 32px; border-radius: 50%;
-    background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
-    color: #fff; display: flex; align-items: center; justify-content: center;
-    cursor: pointer; opacity: 0; transition: all 0.2s;
-}
-.sexy-card:hover .expand-btn { opacity: 1; }
-.expand-btn:hover { background: rgba(255,255,255,0.1); transform: scale(1.1); }
-
-/* Fullscreen Preview Overlay */
-.preview-overlay {
-    position: fixed; inset: 0; z-index: 300;
-    background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
-    display: flex; align-items: center; justify-content: center;
-    animation: fadeIn 0.3s ease-out;
-}
-.preview-modal {
-    width: 90vw; height: 90vh; background: #000;
-    border: 1px solid var(--glass-border); border-radius: 16px;
-    display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9);
-}
-.preview-header {
-    padding: 16px 24px; border-bottom: 1px solid var(--glass-border);
-    display: flex; justify-content: space-between; align-items: center;
-    background: #111;
-}
-.preview-header h3 { margin: 0; font-size: 1.1rem; color: #fff; }
-.close-preview-button {
-    background: transparent; border: none; color: #fff; cursor: pointer;
-    opacity: 0.7; transition: opacity 0.2s;
-}
-.close-preview-button:hover { opacity: 1; }
-.preview-content { flex: 1; background: #fff; }
-.preview-content iframe { width: 100%; height: 100%; border: none; }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-/* Layout Preview Blocks */
+/* Enhanced Layout Previews */
 .preview-box {
     width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    background: #09090b; padding: 20px; box-sizing: border-box;
-    overflow: hidden;
+    background: #09090b; overflow: hidden; position: relative;
 }
-.preview-box div { border-radius: 4px; transition: all 0.3s; }
 
-.preview-box.standard span { color: #555; font-size: 12px; border: 1px dashed #444; padding: 10px; border-radius: 4px; }
-.preview-box.hero .hero-content { width: 40px; height: 30px; background: #333; border: 1px solid #444; }
-.preview-box.glass .glass-pane { width: 60px; height: 40px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(4px); }
-.preview-box.mobile { flex-direction: column; gap: 4px; }
-.preview-box.mobile .notch { width: 10px; height: 2px; background: #333; }
-.preview-box.mobile .screen { width: 30px; height: 50px; border: 2px solid #333; border-radius: 6px; }
-.preview-box.brutal .brutal-box { width: 40px; height: 30px; background: #fff; border: 2px solid #000; box-shadow: 4px 4px 0 #000; }
+/* Standard */
+.preview-box.standard { flex-direction: column; gap: 6px; padding: 25px; align-items: flex-start; background: #fff; }
+.std-nav { width: 100%; height: 8px; background: #e5e5e5; border-radius: 2px; }
+.std-hero { width: 100%; height: 30px; background: #f4f4f5; border-radius: 2px; }
+.std-grid { display: flex; gap: 4px; width: 100%; height: 100%; }
+.std-item { flex: 1; background: #f4f4f5; border-radius: 2px; }
 
-.preview-box.bento { display: grid; grid-template-columns: 2fr 1fr; gap: 4px; padding: 40px; }
-.preview-box.bento .b1 { background: #333; height: 100%; }
-.preview-box.bento .b2 { background: #222; height: 100%; }
-.preview-box.bento .b3 { background: #222; grid-column: span 2; height: 20px; }
+/* Hero Center */
+.preview-box.hero { background: #09090b; position: relative; }
+.hero-bg-glow { position: absolute; width: 60px; height: 60px; background: radial-gradient(circle, rgba(59,130,246,0.3) 0%, transparent 70%); top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.hero-card { position: relative; width: 80px; padding: 12px; background: #18181b; border: 1px solid #27272a; border-radius: 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.hero-title { width: 60px; height: 4px; background: #fff; border-radius: 2px; }
+.hero-subtitle { width: 40px; height: 3px; background: #52525b; border-radius: 2px; }
+.hero-button { width: 24px; height: 6px; background: #3b82f6; border-radius: 2px; margin-top: 2px; }
 
-.preview-box.saas { display: grid; grid-template-columns: 1fr 3fr; gap: 4px; padding: 20px; height: 100%; width: 100%; box-sizing: border-box; }
-.preview-box.saas .side-nav { background: #222; height: 100%; padding: 4px; }
-.preview-box.saas .nav-line { height: 2px; width: 10px; background: #444; margin-bottom: 2px; }
-.preview-box.saas .main-area { background: #111; height: 100%; padding: 8px; }
-.preview-box.saas .content-block { width: 100%; height: 20px; background: #222; border-radius: 2px; }
+/* Glassmorphism */
+.preview-box.glass { background: #1e1e2e; position: relative; overflow: hidden; }
+.glass-blob { position: absolute; border-radius: 50%; filter: blur(8px); }
+.glass-blob.one { width: 40px; height: 40px; background: #c026d3; top: 20px; right: 30px; }
+.glass-blob.two { width: 30px; height: 30px; background: #3b82f6; bottom: 30px; left: 40px; }
+.glass-card { 
+    width: 80px; height: 50px; 
+    background: rgba(255, 255, 255, 0.1); 
+    backdrop-filter: blur(8px); 
+    border: 1px solid rgba(255, 255, 255, 0.2); 
+    border-radius: 8px; 
+    position: relative; 
+    z-index: 10; 
+    transform: rotate(-5deg);
+}
+.glass-shine { position: absolute; top: 0; left: 0; right: 0; height: 50%; background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 100%); }
 
-.preview-box.split { display: flex; width: 100%; height: 100%; }
-.preview-box.split .v1 { flex: 1; background: #000; }
-.preview-box.split .v2 { flex: 1; background: #333; }
+/* Mobile Frame */
+.preview-box.mobile { background: #f0f0f0; }
+.mobile-shell { width: 50px; height: 80px; background: #18181b; border-radius: 8px; padding: 2px; display: flex; align-items: center; justify-content: center; }
+.mobile-screen { width: 100%; height: 100%; background: #fff; border-radius: 6px; overflow: hidden; display: flex; flex-direction: column; }
+.mobile-app-header { height: 12px; background: #e4e4e7; border-bottom: 1px solid #d4d4d8; }
+.mobile-app-body { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.mobile-row { height: 8px; background: #f4f4f5; border-radius: 2px; }
+
+/* Bento */
+.preview-box.bento { background: #111; padding: 25px; gap: 6px; display: grid; grid-template-columns: 1.5fr 1fr; grid-template-rows: 1fr 1fr; }
+.bento-item { background: #27272a; border-radius: 6px; border: 1px solid #3f3f46; }
+.bento-item.main { grid-row: span 2; background: linear-gradient(135deg, #27272a 0%, #18181b 100%); }
+.bento-item.side-top { background: #3f3f46; }
+.bento-item.side-bottom { background: #27272a; }
+
+/* SaaS */
+.preview-box.saas { background: #f8fafc; display: flex; align-items: stretch; padding: 0; }
+.saas-nav { width: 24px; background: #0f172a; flex-shrink: 0; }
+.saas-body { flex: 1; display: flex; flex-direction: column; padding: 6px; gap: 6px; }
+.saas-header-bar { height: 10px; background: #fff; border: 1px solid #e2e8f0; border-radius: 3px; }
+.saas-content-grid { display: flex; gap: 6px; flex: 1; }
+.saas-widget { background: #fff; border: 1px solid #e2e8f0; border-radius: 3px; }
+.saas-widget.lg { flex: 2; }
+.saas-widget.sm { flex: 1; }
+
+/* Brutal */
+.preview-box.brutal { background: #fdba74; position: relative; overflow: hidden; }
+.brutal-bg-pattern { position: absolute; inset: 0; background-image: radial-gradient(#000 1px, transparent 1px); background-size: 8px 8px; opacity: 0.2; }
+.brutal-container { 
+    position: relative; z-index: 2; 
+    background: #fff; border: 3px solid #000; 
+    padding: 8px 12px; 
+    box-shadow: 4px 4px 0 #000; 
+    transform: rotate(-2deg);
+}
+.brutal-title { font-family: sans-serif; font-weight: 900; font-size: 10px; letter-spacing: 1px; color: #000; }
+
+/* Split */
+.preview-box.split { background: #fff; display: flex; padding: 0; }
+.split-image-side { flex: 1; background: #000; }
+.split-text-side { flex: 1; padding: 12px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.split-line { height: 3px; background: #d4d4d8; width: 80%; }
+.split-line.short { width: 50%; }
+.split-btn { height: 6px; width: 20px; background: #000; margin-top: 4px; }
 
 .sexy-label {
     padding: 16px;
