@@ -20,10 +20,10 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
     {
         name: "Standard",
         css: "",
-        previewHtml: `<div class="preview-box standard"><span>Standard</span></div>`
+        previewHtml: `<div class="preview-box standard"><span>No Layout</span></div>`
     },
     {
-        name: "Hero Display",
+        name: "Hero Center",
         css: `
             body { 
                 margin: 0; display: flex; align-items: center; justify-content: center; 
@@ -32,7 +32,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .layout-container { width: 100%; max-width: 800px; animation: floatUp 0.8s ease-out; }
             @keyframes floatUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         `,
-        previewHtml: `<div class="preview-box hero"><div></div></div>`
+        previewHtml: `<div class="preview-box hero"><div class="hero-content"></div></div>`
     },
     {
         name: "Glassmorphism",
@@ -49,10 +49,10 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
                 box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
             }
         `,
-        previewHtml: `<div class="preview-box glass"><div></div></div>`
+        previewHtml: `<div class="preview-box glass"><div class="glass-pane"></div></div>`
     },
     {
-        name: "Mobile Portrait",
+        name: "Mobile Frame",
         css: `
             body {
                 margin: 0; display: flex; align-items: center; justify-content: center;
@@ -65,19 +65,19 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             }
             .layout-container::-webkit-scrollbar { display: none; }
         `,
-        previewHtml: `<div class="preview-box mobile"><div></div></div>`
+        previewHtml: `<div class="preview-box mobile"><div class="notch"></div><div class="screen"></div></div>`
     },
     {
-        name: "Bento Dashboard",
+        name: "Bento Grid",
         css: `
             body { margin: 0; background: #f4f4f5; padding: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; min-height: 100vh; }
             .layout-container { grid-column: span 2; background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
             .side-bento { background: #fff; border-radius: 24px; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: center; color: #888; font-weight: 500; }
         `,
-        previewHtml: `<div class="preview-box bento"><div class="b1"></div><div class="b2"></div></div>`
+        previewHtml: `<div class="preview-box bento"><div class="b1"></div><div class="b2"></div><div class="b3"></div></div>`
     },
     {
-        name: "SaaS Sidebar",
+        name: "SaaS Dashboard",
         css: `
             body { margin: 0; display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; background: #fff; }
             .sidebar { background: #18181b; color: #fff; padding: 40px; display: flex; flex-direction: column; gap: 20px; }
@@ -85,7 +85,7 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .main-content { padding: 60px; background: #fafafa; display: flex; flex-direction: column; align-items: flex-start; }
             .layout-container { width: 100%; max-width: 900px; background: #fff; border-radius: 12px; border: 1px solid #eee; padding: 40px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         `,
-        previewHtml: `<div class="preview-box saas"><div class="side"></div><div class="main"></div></div>`
+        previewHtml: `<div class="preview-box saas"><div class="side-nav"><div class="nav-line"></div></div><div class="main-area"><div class="content-block"></div></div></div>`
     },
     {
         name: "Neo-Brutalist",
@@ -96,10 +96,10 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
                 box-shadow: 12px 12px 0px #000;
             }
         `,
-        previewHtml: `<div class="preview-box brutal"><div></div></div>`
+        previewHtml: `<div class="preview-box brutal"><div class="brutal-box"></div></div>`
     },
     {
-        name: "Split Vertical",
+        name: "Split Screen",
         css: `
             body { margin: 0; display: flex; min-height: 100vh; }
             .visual-side { flex: 1; background: #000; color: #fff; display: flex; align-items: center; justify-content: center; font-family: serif; font-size: 4rem; opacity: 0.9; }
@@ -107,21 +107,5 @@ export const LAYOUT_OPTIONS: LayoutOption[] = [
             .layout-container { width: 100%; max-width: 500px; }
         `,
         previewHtml: `<div class="preview-box split"><div class="v1"></div><div class="v2"></div></div>`
-    },
-    {
-        name: "Art Gallery",
-        css: `
-            body { margin: 0; background: #f8f8f8; padding: 80px; display: flex; justify-content: center; }
-            .layout-container {
-                background: #fff; padding: 40px; border: 20px solid #fff;
-                box-shadow: inset 0 0 10px rgba(0,0,0,0.1), 0 30px 60px rgba(0,0,0,0.1);
-                position: relative;
-            }
-            .layout-container::after {
-                content: "Exhibition 2025"; position: absolute; bottom: -60px; left: 0;
-                font-family: serif; color: #888; font-size: 14px; font-style: italic;
-            }
-        `,
-        previewHtml: `<div class="preview-box gallery"><div></div></div>`
     }
 ];

@@ -21,3 +21,11 @@ export interface Session {
 
 export interface ComponentVariation { name: string; html: string; }
 export interface LayoutOption { name: string; css: string; previewHtml: string; }
+
+export type Framework = 'vanilla' | 'tailwind' | 'react-mui';
+
+export interface GenerationSettings {
+    framework: Framework;
+    dataContext: string; // JSON or text description of data
+    autoA11y: boolean;   // Automatically enhance accessibility
+}
