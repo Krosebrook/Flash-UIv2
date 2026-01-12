@@ -35,7 +35,8 @@ import {
     UndoIcon,
     RedoIcon,
     SettingsIcon,
-    WandIcon
+    WandIcon,
+    CopyIcon
 } from './components/Icons';
 
 const parseJsonStream = async function* (responseStream: AsyncGenerator<{ text: string }>) {
@@ -113,6 +114,7 @@ function App() {
 
   const [componentVariations, setComponentVariations] = useState<ComponentVariation[]>([]);
   const [previewItem, setPreviewItem] = useState<{html: string, name: string} | null>(null);
+  const [copyButtonText, setCopyButtonText] = useState('Copy Code');
 
   const inputRef = useRef<HTMLInputElement>(null);
   const gridScrollRef = useRef<HTMLDivElement>(null);
@@ -196,14 +198,24 @@ function App() {
     setInputValue(event.target.value);
   };
 
-  const handleGenerateVariations = useCallback(async () => {
+  const fetchVariations = useCallback(async (append: boolean) => {
     const currentSession = sessions[currentSessionIndex];
     if (!currentSession || focusedArtifactIndex === null) return;
+    
+    // Safety check for max limit
+    if (append && componentVariations.length >= 6) return;
+
     const currentArtifact = currentSession.artifacts[focusedArtifactIndex];
 
     setIsLoading(true);
-    setComponentVariations([]);
-    setDrawerState({ isOpen: true, mode: 'variations', title: 'Variations', data: currentArtifact.id, error: null });
+    
+    // Clear previous errors when starting a new fetch
+    setDrawerState(prev => ({ ...prev, error: null }));
+
+    if (!append) {
+        setComponentVariations([]);
+        setDrawerState({ isOpen: true, mode: 'variations', title: 'Variations', data: currentArtifact.id, error: null });
+    }
 
     try {
         const apiKey = process.env.API_KEY;
@@ -213,9 +225,18 @@ function App() {
         let frameworkInstruction = '';
         if (settings.framework === 'tailwind') frameworkInstruction = 'Use Tailwind CSS via CDN.';
         else if (settings.framework === 'react-mui') frameworkInstruction = 'Use React and Material UI via CDN. Return a complete HTML file.';
+        else if (settings.framework === 'bootstrap') frameworkInstruction = 'Use Bootstrap 5 via CDN. Ensure responsive classes.';
+        else if (settings.framework === 'foundation') frameworkInstruction = 'Use Foundation 6 via CDN. Ensure correct class names.';
+
+        // Determine count
+        const currentCount = append ? componentVariations.length : 0;
+        const limit = 6;
+        const countToFetch = Math.min(3, limit - currentCount);
+        
+        if (countToFetch <= 0) return;
 
         const prompt = `
-You are a master UI/UX designer. Generate 3 RADICAL CONCEPTUAL VARIATIONS of: "${currentSession.prompt}".
+You are a master UI/UX designer. Generate ${countToFetch} RADICAL CONCEPTUAL VARIATIONS of: "${currentSession.prompt}".
 ${frameworkInstruction}
 For EACH variation, invent a unique design persona name and generate high-fidelity HTML/CSS.
 Required JSON Output Format (stream ONE object per line):
@@ -235,6 +256,8 @@ Required JSON Output Format (stream ONE object per line):
         }
     } catch (e: any) {
         console.error("Error generating variations:", e);
+        // Only set error if we aren't appending, or make it a toast in a fuller app
+        // For now, displaying it in the drawer is safer than silent failure
         setDrawerState(prev => ({ 
             ...prev, 
             error: "We encountered an error while designing variations. Please try again." 
@@ -242,7 +265,15 @@ Required JSON Output Format (stream ONE object per line):
     } finally {
         setIsLoading(false);
     }
-  }, [sessions, currentSessionIndex, focusedArtifactIndex, settings.framework]);
+  }, [sessions, currentSessionIndex, focusedArtifactIndex, settings.framework, componentVariations.length]);
+
+  const handleGenerateVariations = useCallback(() => {
+      fetchVariations(false);
+  }, [fetchVariations]);
+
+  const handleLoadMoreVariations = useCallback(() => {
+      fetchVariations(true);
+  }, [fetchVariations]);
 
   const applyVariation = (html: string) => {
       if (focusedArtifactIndex === null) return;
@@ -277,6 +308,27 @@ Required JSON Output Format (stream ONE object per line):
         } : sess
     ));
     setDrawerState(s => ({ ...s, isOpen: false }));
+  };
+
+  const handlePreviewLayout = (e: React.MouseEvent, layout: LayoutOption) => {
+    e.stopPropagation();
+    if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
+    const currentSession = sessions[currentSessionIndex];
+    const currentArtifact = currentSession.artifacts[focusedArtifactIndex];
+    const baseHtml = currentArtifact.originalHtml || currentArtifact.html;
+    
+    let htmlToPreview = baseHtml;
+    if (layout.name !== "Standard") {
+         htmlToPreview = `
+            <style>${layout.css}</style>
+            <div class="layout-container">${baseHtml}</div>
+        `.trim();
+    }
+    
+    setPreviewItem({
+        name: `Preview: ${layout.name}`,
+        html: htmlToPreview
+    });
   };
 
   const updateArtifactCode = (newCode: string) => {
@@ -385,6 +437,20 @@ Required JSON Output Format (stream ONE object per line):
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyCode = () => {
+      if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
+      const currentSession = sessions[currentSessionIndex];
+      const artifact = currentSession.artifacts[focusedArtifactIndex];
+      if (!artifact) return;
+
+      navigator.clipboard.writeText(artifact.html).then(() => {
+          setCopyButtonText('Copied!');
+          setTimeout(() => setCopyButtonText('Copy Code'), 2000);
+      }).catch(err => {
+          console.error('Failed to copy: ', err);
+      });
+  };
+
   const handleSendMessage = useCallback(async (manualPrompt?: string) => {
     const promptToUse = manualPrompt || inputValue;
     const trimmedInput = promptToUse.trim();
@@ -423,6 +489,10 @@ Required JSON Output Format (stream ONE object per line):
             frameworkContext = " Use Tailwind CSS via CDN for styling. Ensure all classes are valid.";
         } else if (settings.framework === 'react-mui') {
             frameworkContext = " Generate a single-file React component using Material UI (MUI) via CDN. Output complete HTML with Babel script to render it.";
+        } else if (settings.framework === 'bootstrap') {
+            frameworkContext = " Use Bootstrap 5 via CDN for styling. Use standard Bootstrap classes.";
+        } else if (settings.framework === 'foundation') {
+            frameworkContext = " Use Foundation 6 CSS via CDN for styling.";
         } else {
             frameworkContext = " Use vanilla CSS.";
         }
@@ -564,7 +634,7 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                 </div>
             )}
             
-            {isLoading && drawerState.mode === 'variations' && !drawerState.error && (
+            {isLoading && drawerState.mode === 'variations' && !drawerState.error && componentVariations.length === 0 && (
                 <div className="loading-state"><ThinkingIcon /> Designing...</div>
             )}
             
@@ -579,6 +649,8 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                             <option value="vanilla">Vanilla CSS</option>
                             <option value="tailwind">Tailwind CSS (CDN)</option>
                             <option value="react-mui">React + Material UI (CDN)</option>
+                            <option value="bootstrap">Bootstrap 5 (CDN)</option>
+                            <option value="foundation">Foundation 6 (CDN)</option>
                         </select>
                         <p className="setting-desc">Determines the tech stack for generated components.</p>
                     </div>
@@ -663,6 +735,16 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                              <div className="sexy-label">{v.name}</div>
                          </div>
                     ))}
+                    {componentVariations.length > 0 && (
+                        <button 
+                            className="load-more-btn" 
+                            onClick={handleLoadMoreVariations} 
+                            disabled={isLoading || componentVariations.length >= 6}
+                        >
+                            {isLoading ? <ThinkingIcon /> : <SparklesIcon />}
+                            {isLoading ? "Generating..." : (componentVariations.length >= 6 ? "Max limit reached" : "Generate More")}
+                        </button>
+                    )}
                 </div>
             )}
             
@@ -670,6 +752,13 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                 <div className="sexy-grid">
                     {LAYOUT_OPTIONS.map((lo, i) => (
                         <div key={i} className="sexy-card" onClick={() => applyLayout(lo)}>
+                            <button 
+                                className="expand-btn" 
+                                onClick={(e) => handlePreviewLayout(e, lo)}
+                                title="Preview with current content"
+                            >
+                                <ExpandIcon />
+                            </button>
                             <div className="sexy-preview">
                                 <div className="preview-container-inner" dangerouslySetInnerHTML={{ __html: lo.previewHtml }} />
                             </div>
@@ -712,6 +801,7 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                     <button onClick={handleGenerateVariations} disabled={isLoading} title="Generate design variations"><SparklesIcon /> Variations</button>
                     <button onClick={handleShowLayouts}><LayoutIcon /> Layouts</button>
                     <button onClick={handleShowCode}><CodeIcon /> Code</button>
+                    <button onClick={handleCopyCode}><CopyIcon /> {copyButtonText}</button>
                     <button onClick={handleDownload}><DownloadIcon /> Save</button>
                  </div>
             </div>

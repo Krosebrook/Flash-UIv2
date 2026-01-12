@@ -22,7 +22,7 @@ export interface Session {
 export interface ComponentVariation { name: string; html: string; }
 export interface LayoutOption { name: string; css: string; previewHtml: string; }
 
-export type Framework = 'vanilla' | 'tailwind' | 'react-mui';
+export type Framework = 'vanilla' | 'tailwind' | 'react-mui' | 'bootstrap' | 'foundation';
 
 export interface GenerationSettings {
     framework: Framework;
