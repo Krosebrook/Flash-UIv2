@@ -1,3 +1,4 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -10,14 +11,15 @@ interface SideDrawerProps {
     onClose: () => void;
     title: string;
     children?: React.ReactNode;
+    position?: 'left' | 'right';
 }
 
-const SideDrawer = ({ isOpen, onClose, title, children }: SideDrawerProps) => {
+const SideDrawer = ({ isOpen, onClose, title, children, position = 'right' }: SideDrawerProps) => {
     if (!isOpen) return null;
 
     return (
         <div className="drawer-overlay" onClick={onClose}>
-            <div className="drawer-content" onClick={(e) => e.stopPropagation()}>
+            <div className={`drawer-content ${position}`} onClick={(e) => e.stopPropagation()}>
                 <div className="drawer-header">
                     <h2>{title}</h2>
                     <button onClick={onClose} className="close-button">&times;</button>

@@ -36,7 +36,9 @@ import {
     RedoIcon,
     SettingsIcon,
     WandIcon,
-    CopyIcon
+    CopyIcon,
+    HistoryIcon,
+    TrashIcon
 } from './components/Icons';
 
 const parseJsonStream = async function* (responseStream: AsyncGenerator<{ text: string }>) {
@@ -75,7 +77,6 @@ const parseJsonStream = async function* (responseStream: AsyncGenerator<{ text: 
 };
 
 function App() {
-  // Initialize with loaded sessions or empty array
   const { 
       state: sessions, 
       set: setSessions, 
@@ -86,17 +87,17 @@ function App() {
   } = useHistory<Session[]>(loadSessions());
 
   const [currentSessionIndex, setCurrentSessionIndex] = useState<number>(() => {
-      // If we loaded sessions, start at the last one
       const loaded = loadSessions();
       return loaded.length > 0 ? loaded.length - 1 : -1;
   });
   
   const [focusedArtifactIndex, setFocusedArtifactIndex] = useState<number | null>(null);
-  
   const [inputValue, setInputValue] = useState<string>('');
+  const [iterationInput, setIterationInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
   const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
+  const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   
   const [settings, setSettings] = useState<GenerationSettings>({
       framework: 'vanilla',
@@ -106,7 +107,7 @@ function App() {
 
   const [drawerState, setDrawerState] = useState<{
       isOpen: boolean;
-      mode: 'code' | 'variations' | 'layouts' | 'settings' | 'enhance' | null;
+      mode: 'code' | 'variations' | 'layouts' | 'settings' | 'enhance' | 'history' | null;
       title: string;
       data: any;
       error?: string | null;
@@ -117,44 +118,32 @@ function App() {
   const [copyButtonText, setCopyButtonText] = useState('Copy Code');
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const iterationInputRef = useRef<HTMLInputElement>(null);
   const gridScrollRef = useRef<HTMLDivElement>(null);
 
-  // Persistence Effect
   useEffect(() => {
       const handler = setTimeout(() => {
           saveSessions(sessions);
-      }, 1000); // Debounce save by 1s to avoid thrashing during streaming
+      }, 1000); 
       return () => clearTimeout(handler);
   }, [sessions]);
 
   useEffect(() => {
-      inputRef.current?.focus();
-  }, []);
+      if (!isLoading) {
+          inputRef.current?.focus();
+      }
+  }, [isLoading]);
 
   useEffect(() => {
-      // Setup keyboard shortcuts for undo/redo
       const handleGlobalKeyDown = (e: KeyboardEvent) => {
           if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
               e.preventDefault();
-              if (e.shiftKey) {
-                 if (canRedo) redo();
-              } else {
-                 if (canUndo) undo();
-              }
+              if (e.shiftKey) { if (canRedo) redo(); } else { if (canUndo) undo(); }
           }
       };
       window.addEventListener('keydown', handleGlobalKeyDown);
       return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [undo, redo, canUndo, canRedo]);
-
-  useEffect(() => {
-    if (focusedArtifactIndex !== null && window.innerWidth <= 1024) {
-        if (gridScrollRef.current) {
-            gridScrollRef.current.scrollTop = 0;
-        }
-        window.scrollTo(0, 0);
-    }
-  }, [focusedArtifactIndex]);
 
   useEffect(() => {
       const interval = setInterval(() => {
@@ -163,53 +152,22 @@ function App() {
       return () => clearInterval(interval);
   }, [placeholders.length]);
 
-  useEffect(() => {
-      const fetchDynamicPlaceholders = async () => {
-          try {
-              const apiKey = process.env.API_KEY;
-              if (!apiKey) return;
-              const ai = new GoogleGenAI({ apiKey });
-              const response = await ai.models.generateContent({
-                  model: 'gemini-3-flash-preview',
-                  contents: { 
-                      role: 'user', 
-                      parts: [{ 
-                          text: 'Generate 20 creative, short, diverse UI component prompts (e.g. "bioluminescent task list"). Return ONLY a raw JSON array of strings.' 
-                      }] 
-                  }
-              });
-              const text = response.text || '[]';
-              const jsonMatch = text.match(/\[[\s\S]*\]/);
-              if (jsonMatch) {
-                  const newPlaceholders = JSON.parse(jsonMatch[0]);
-                  if (Array.isArray(newPlaceholders) && newPlaceholders.length > 0) {
-                      const shuffled = newPlaceholders.sort(() => 0.5 - Math.random()).slice(0, 10);
-                      setPlaceholders(prev => [...prev, ...shuffled]);
-                  }
-              }
-          } catch (e) {
-              console.warn("Silently failed to fetch dynamic placeholders", e);
-          }
-      };
-      setTimeout(fetchDynamicPlaceholders, 1000);
-  }, []);
-
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(event.target.value);
+  };
+
+  const handleIterationInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setIterationInput(event.target.value);
   };
 
   const fetchVariations = useCallback(async (append: boolean) => {
     const currentSession = sessions[currentSessionIndex];
     if (!currentSession || focusedArtifactIndex === null) return;
     
-    // Safety check for max limit
     if (append && componentVariations.length >= 6) return;
-
     const currentArtifact = currentSession.artifacts[focusedArtifactIndex];
 
     setIsLoading(true);
-    
-    // Clear previous errors when starting a new fetch
     setDrawerState(prev => ({ ...prev, error: null }));
 
     if (!append) {
@@ -228,7 +186,6 @@ function App() {
         else if (settings.framework === 'bootstrap') frameworkInstruction = 'Use Bootstrap 5 via CDN. Ensure responsive classes.';
         else if (settings.framework === 'foundation') frameworkInstruction = 'Use Foundation 6 via CDN. Ensure correct class names.';
 
-        // Determine count
         const currentCount = append ? componentVariations.length : 0;
         const limit = 6;
         const countToFetch = Math.min(3, limit - currentCount);
@@ -236,9 +193,12 @@ function App() {
         if (countToFetch <= 0) return;
 
         const prompt = `
-You are a master UI/UX designer. Generate ${countToFetch} RADICAL CONCEPTUAL VARIATIONS of: "${currentSession.prompt}".
+You are a master UI/UX designer. I have an existing component and I want ${countToFetch} RADICAL CONCEPTUAL VARIATIONS of it.
+Original Prompt: "${currentSession.prompt}"
+Existing Code: ${currentArtifact.html}
+
 ${frameworkInstruction}
-For EACH variation, invent a unique design persona name and generate high-fidelity HTML/CSS.
+For EACH variation, invent a unique design persona name (e.g. "Hyper-Minimalism", "Retro-Futuristic", "Neo-Glass") and generate high-fidelity HTML/CSS.
 Required JSON Output Format (stream ONE object per line):
 \`{ "name": "Persona Name", "html": "..." }\`
         `.trim();
@@ -246,7 +206,7 @@ Required JSON Output Format (stream ONE object per line):
         const responseStream = await ai.models.generateContentStream({
             model: 'gemini-3-flash-preview',
              contents: [{ parts: [{ text: prompt }], role: 'user' }],
-             config: { temperature: 1.2 }
+             config: { temperature: 1.1 }
         });
 
         for await (const variation of parseJsonStream(responseStream)) {
@@ -255,9 +215,6 @@ Required JSON Output Format (stream ONE object per line):
             }
         }
     } catch (e: any) {
-        console.error("Error generating variations:", e);
-        // Only set error if we aren't appending, or make it a toast in a fuller app
-        // For now, displaying it in the drawer is safer than silent failure
         setDrawerState(prev => ({ 
             ...prev, 
             error: "We encountered an error while designing variations. Please try again." 
@@ -333,7 +290,6 @@ Required JSON Output Format (stream ONE object per line):
 
   const updateArtifactCode = (newCode: string) => {
       if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
-      
       setSessions(prev => prev.map((sess, i) => 
           i === currentSessionIndex ? {
               ...sess,
@@ -342,16 +298,12 @@ Required JSON Output Format (stream ONE object per line):
               )
           } : sess
       ));
-      
-      // Don't close drawer immediately to allow continuous editing, 
-      // but maybe show a success toast in a real app.
   };
 
-  const handleEnhance = async (type: 'a11y' | 'format' | 'dummy') => {
+  const handleEnhance = async (type: 'a11y' | 'format' | 'dummy' | 'responsive' | 'tailwind') => {
     if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
-    
     setIsLoading(true);
-    setDrawerState(s => ({ ...s, isOpen: false })); // Close enhance menu
+    setDrawerState(s => ({ ...s, isOpen: false }));
     
     try {
         const apiKey = process.env.API_KEY;
@@ -362,11 +314,13 @@ Required JSON Output Format (stream ONE object per line):
         const artifact = currentSession.artifacts[focusedArtifactIndex];
         
         let enhancementPrompt = '';
-        if (type === 'a11y') enhancementPrompt = 'Analyze the following HTML and fix any accessibility issues (ARIA labels, contrast, semantic tags). Return only the corrected HTML.';
-        if (type === 'format') enhancementPrompt = 'Format the following code to be clean, indented, and compliant with Prettier standards. Fix linting errors. Return only the code.';
-        if (type === 'dummy') enhancementPrompt = 'Inject realistic dummy data into this component to make it look used and populated. Return only the HTML.';
+        if (type === 'a11y') enhancementPrompt = 'Analyze the following HTML and fix any accessibility issues (ARIA labels, contrast, semantic tags). Ensure it meets WCAG standards for high accessibility. Return only the corrected HTML.';
+        if (type === 'format') enhancementPrompt = 'Format the following code to be clean, indented, and compliant with Prettier standards. Return only the code.';
+        if (type === 'dummy') enhancementPrompt = 'Inject realistic, high-quality placeholder data (real names, detailed descriptions, high-quality images from Unsplash, etc.) into this component. Make it look like a real production app. Return only the HTML.';
+        if (type === 'responsive') enhancementPrompt = 'Make this component perfectly responsive across mobile, tablet, and desktop. Add media queries or responsive classes if missing. Return only the HTML.';
+        if (type === 'tailwind') enhancementPrompt = 'Refactor this component to use Tailwind CSS utility classes exclusively for all styling. Replace existing CSS. Return only the HTML.';
 
-        const fullPrompt = `${enhancementPrompt}\n\nCode:\n${artifact.html}`;
+        const fullPrompt = `${enhancementPrompt}\n\nExisting Code:\n${artifact.html}`;
 
         const response = await ai.models.generateContent({
              model: 'gemini-3-flash-preview',
@@ -390,14 +344,85 @@ Required JSON Output Format (stream ONE object per line):
     }
   };
 
-  const handleClearHistory = () => {
-    if (confirm("Are you sure you want to delete all history? This cannot be undone.")) {
-        clearSessions();
-        setSessions([]);
-        setCurrentSessionIndex(-1);
-        setFocusedArtifactIndex(null);
-        setDrawerState(s => ({...s, isOpen: false}));
-    }
+  const handleIterate = async () => {
+      if (focusedArtifactIndex === null || currentSessionIndex === -1 || !iterationInput.trim() || isLoading) return;
+      const instruction = iterationInput.trim();
+      setIterationInput('');
+      setIsLoading(true);
+
+      try {
+          const apiKey = process.env.API_KEY;
+          if (!apiKey) throw new Error("API_KEY missing");
+          const ai = new GoogleGenAI({ apiKey });
+          const currentSession = sessions[currentSessionIndex];
+          const artifact = currentSession.artifacts[focusedArtifactIndex];
+
+          const prompt = `
+You are a senior frontend engineer. Modify the existing UI component based on the request.
+Existing Code:
+${artifact.html}
+
+User Request: "${instruction}"
+
+Instructions:
+1. Maintain the overall style and framework (if any).
+2. Apply the requested changes precisely.
+3. Return ONLY the complete updated HTML/CSS. No markdown.
+          `.trim();
+
+          const responseStream = await ai.models.generateContentStream({
+              model: 'gemini-3-pro-preview',
+              contents: [{ role: 'user', parts: [{ text: prompt }] }]
+          });
+
+          let accumulatedHtml = '';
+          for await (const chunk of responseStream) {
+              if (typeof chunk.text === 'string') {
+                  accumulatedHtml += chunk.text;
+                  setSessions(prev => prev.map((sess, i) => 
+                      i === currentSessionIndex ? {
+                          ...sess,
+                          artifacts: sess.artifacts.map((art, j) => 
+                              j === focusedArtifactIndex ? { ...art, html: accumulatedHtml, status: 'streaming' } : art
+                          )
+                      } : sess
+                  ));
+              }
+          }
+          
+          let finalHtml = accumulatedHtml.replace(/```html|```/g, '').trim();
+          setSessions(prev => prev.map((sess, i) => 
+              i === currentSessionIndex ? {
+                  ...sess,
+                  artifacts: sess.artifacts.map((art, j) => 
+                      j === focusedArtifactIndex ? { ...art, html: finalHtml, originalHtml: finalHtml, status: 'complete' } : art
+                  )
+              } : sess
+          ));
+      } catch (e) {
+          console.error("Iteration failed", e);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const confirmClearHistory = () => {
+      clearSessions();
+      setSessions([]);
+      setCurrentSessionIndex(-1);
+      setFocusedArtifactIndex(null);
+      setDrawerState(s => ({...s, isOpen: false}));
+      setIsConfirmingClear(false);
+  };
+
+  const handleDeleteSession = (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      setSessions(prev => {
+          const newSessions = prev.filter(s => s.id !== id);
+          if (newSessions.length === 0) setCurrentSessionIndex(-1);
+          else if (currentSessionIndex >= newSessions.length) setCurrentSessionIndex(newSessions.length - 1);
+          return newSessions;
+      });
   };
 
   const handleShowCode = () => {
@@ -420,12 +445,14 @@ Required JSON Output Format (stream ONE object per line):
       setDrawerState({ isOpen: true, mode: 'enhance', title: 'Enhance Code', data: null, error: null });
   };
 
+  const handleShowHistory = () => {
+      setDrawerState({ isOpen: true, mode: 'history', title: 'Recent Generations', data: null, error: null });
+  };
+
   const handleDownload = () => {
     if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
     const currentSession = sessions[currentSessionIndex];
     const artifact = currentSession.artifacts[focusedArtifactIndex];
-    if (!artifact) return;
-
     const blob = new Blob([artifact.html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -441,26 +468,20 @@ Required JSON Output Format (stream ONE object per line):
       if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
       const currentSession = sessions[currentSessionIndex];
       const artifact = currentSession.artifacts[focusedArtifactIndex];
-      if (!artifact) return;
-
       navigator.clipboard.writeText(artifact.html).then(() => {
           setCopyButtonText('Copied!');
           setTimeout(() => setCopyButtonText('Copy Code'), 2000);
-      }).catch(err => {
-          console.error('Failed to copy: ', err);
       });
   };
 
   const handleSendMessage = useCallback(async (manualPrompt?: string) => {
     const promptToUse = manualPrompt || inputValue;
     const trimmedInput = promptToUse.trim();
-    
     if (!trimmedInput || isLoading) return;
     if (!manualPrompt) setInputValue('');
 
     setIsLoading(true);
     const sessionId = generateId();
-
     const placeholderArtifacts: Artifact[] = Array(3).fill(null).map((_, i) => ({
         id: `${sessionId}_${i}`,
         styleName: 'Designing...',
@@ -476,37 +497,22 @@ Required JSON Output Format (stream ONE object per line):
     };
 
     setSessions(prev => [...prev, newSession]);
-    setCurrentSessionIndex(prev => prev + 1); // Move to the new session
+    setCurrentSessionIndex(prev => prev + 1); 
     setFocusedArtifactIndex(null); 
 
     try {
         const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API_KEY is not configured.");
+        if (!apiKey) throw new Error("API_KEY missing");
         const ai = new GoogleGenAI({ apiKey });
 
         let frameworkContext = "";
-        if (settings.framework === 'tailwind') {
-            frameworkContext = " Use Tailwind CSS via CDN for styling. Ensure all classes are valid.";
-        } else if (settings.framework === 'react-mui') {
-            frameworkContext = " Generate a single-file React component using Material UI (MUI) via CDN. Output complete HTML with Babel script to render it.";
-        } else if (settings.framework === 'bootstrap') {
-            frameworkContext = " Use Bootstrap 5 via CDN for styling. Use standard Bootstrap classes.";
-        } else if (settings.framework === 'foundation') {
-            frameworkContext = " Use Foundation 6 CSS via CDN for styling.";
-        } else {
-            frameworkContext = " Use vanilla CSS.";
-        }
+        if (settings.framework === 'tailwind') frameworkContext = " Use Tailwind CSS via CDN.";
+        else if (settings.framework === 'react-mui') frameworkContext = " Use React and MUI via CDN.";
+        else if (settings.framework === 'bootstrap') frameworkContext = " Use Bootstrap 5.";
+        else if (settings.framework === 'foundation') frameworkContext = " Use Foundation 6.";
+        else frameworkContext = " Use vanilla CSS.";
 
-        let dataContext = "";
-        if (settings.dataContext) {
-            dataContext = ` Use this data context for content: ${settings.dataContext}`;
-        }
-
-        const stylePrompt = `
-Generate 3 distinct design directions for: "${trimmedInput}". 
-Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "Glassmorphic Flux", "Minimal Paper Press"]).
-        `.trim();
-
+        const stylePrompt = `Generate 3 distinct creative names for design directions for: "${trimmedInput}". Return raw JSON array of 3 strings.`.trim();
         const styleResponse = await ai.models.generateContent({
             model: 'gemini-3-flash-preview',
             contents: { role: 'user', parts: [{ text: stylePrompt }] }
@@ -522,7 +528,7 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
 
         const generateArtifact = async (artifact: Artifact, styleInstruction: string) => {
             try {
-                const prompt = `Create a stunning UI component for: "${trimmedInput}". Style: ${styleInstruction}.${frameworkContext}${dataContext} Return ONLY raw HTML. No markdown.`.trim();
+                const prompt = `Create a stunning UI component for: "${trimmedInput}". Style: ${styleInstruction}.${frameworkContext} Return ONLY raw HTML. No markdown.`.trim();
                 const responseStream = await ai.models.generateContentStream({
                     model: 'gemini-3-flash-preview',
                     contents: [{ parts: [{ text: prompt }], role: "user" }],
@@ -553,11 +559,7 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
         };
 
         await Promise.all(placeholderArtifacts.map((art, i) => generateArtifact(art, generatedStyles[i])));
-    } catch (e) {
-        console.error(e);
-    } finally {
-        setIsLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setIsLoading(false); }
   }, [inputValue, isLoading, settings]);
 
   const handleSurpriseMe = () => {
@@ -567,47 +569,58 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !isLoading) {
-      event.preventDefault();
-      handleSendMessage();
-    } else if (event.key === 'Tab' && !inputValue && !isLoading) {
-        event.preventDefault();
-        setInputValue(placeholders[placeholderIndex]);
-    }
+    if (event.key === 'Enter' && !isLoading) { event.preventDefault(); handleSendMessage(); }
+    else if (event.key === 'Tab' && !inputValue && !isLoading) { event.preventDefault(); setInputValue(placeholders[placeholderIndex]); }
+  };
+
+  const handleIterationKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter' && !isLoading) { event.preventDefault(); handleIterate(); }
   };
 
   const nextItem = useCallback(() => {
-      if (focusedArtifactIndex !== null) {
-          if (focusedArtifactIndex < 2) setFocusedArtifactIndex(focusedArtifactIndex + 1);
-      } else if (currentSessionIndex < sessions.length - 1) {
-          setCurrentSessionIndex(currentSessionIndex + 1);
-      }
+      if (focusedArtifactIndex !== null) { if (focusedArtifactIndex < 2) setFocusedArtifactIndex(focusedArtifactIndex + 1); }
+      else if (currentSessionIndex < sessions.length - 1) setCurrentSessionIndex(currentSessionIndex + 1);
   }, [currentSessionIndex, sessions.length, focusedArtifactIndex]);
 
   const prevItem = useCallback(() => {
-      if (focusedArtifactIndex !== null) {
-          if (focusedArtifactIndex > 0) setFocusedArtifactIndex(focusedArtifactIndex - 1);
-      } else if (currentSessionIndex > 0) {
-          setCurrentSessionIndex(currentSessionIndex - 1);
-      }
+      if (focusedArtifactIndex !== null) { if (focusedArtifactIndex > 0) setFocusedArtifactIndex(focusedArtifactIndex - 1); }
+      else if (currentSessionIndex > 0) setCurrentSessionIndex(currentSessionIndex - 1);
   }, [currentSessionIndex, focusedArtifactIndex]);
+
+  const jumpToSession = (index: number) => {
+      setCurrentSessionIndex(index);
+      setFocusedArtifactIndex(null);
+      setDrawerState(s => ({ ...s, isOpen: false }));
+  };
 
   const hasStarted = sessions.length > 0 || isLoading;
   const currentSession = sessions[currentSessionIndex];
+  const focusedArtifact = (currentSession && focusedArtifactIndex !== null) ? currentSession.artifacts[focusedArtifactIndex] : null;
 
   let canGoBack = (focusedArtifactIndex !== null ? focusedArtifactIndex > 0 : currentSessionIndex > 0);
   let canGoForward = (focusedArtifactIndex !== null ? focusedArtifactIndex < 2 : currentSessionIndex < sessions.length - 1);
 
   return (
     <>
+        {isConfirmingClear && (
+            <div className="confirmation-modal-overlay">
+                <div className="confirmation-modal">
+                    <h3>Clear All History?</h3>
+                    <p>This will permanently delete all your generated sessions and artifacts. This action cannot be undone.</p>
+                    <div className="confirmation-actions">
+                        <button className="confirm-cancel" onClick={() => setIsConfirmingClear(false)}>Cancel</button>
+                        <button className="confirm-destructive" onClick={confirmClearHistory}>Delete Everything</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {previewItem && (
             <div className="preview-overlay">
                 <div className="preview-modal">
                     <div className="preview-header">
                         <h3>{previewItem.name}</h3>
-                        <button onClick={() => setPreviewItem(null)} className="close-preview-button">
-                            <CloseIcon />
-                        </button>
+                        <button onClick={() => setPreviewItem(null)} className="close-preview-button"><CloseIcon /></button>
                     </div>
                     <div className="preview-content">
                         <iframe srcDoc={previewItem.html} title="Preview" />
@@ -617,6 +630,8 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
         )}
 
         <div className="global-controls">
+            <button className="icon-btn" onClick={handleShowHistory} title="History"><HistoryIcon /></button>
+            <div className="divider"></div>
             <button className="icon-btn" disabled={!canUndo} onClick={undo} title="Undo"><UndoIcon /></button>
             <button className="icon-btn" disabled={!canRedo} onClick={redo} title="Redo"><RedoIcon /></button>
             <div className="divider"></div>
@@ -627,59 +642,56 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
             isOpen={drawerState.isOpen} 
             onClose={() => setDrawerState(s => ({...s, isOpen: false}))} 
             title={drawerState.title}
+            position={drawerState.mode === 'history' ? 'left' : 'right'}
         >
-            {drawerState.error && (
-                <div className="drawer-error">
-                   {drawerState.error}
-                </div>
-            )}
+            {drawerState.error && <div className="drawer-error">{drawerState.error}</div>}
             
             {isLoading && drawerState.mode === 'variations' && !drawerState.error && componentVariations.length === 0 && (
                 <div className="loading-state"><ThinkingIcon /> Designing...</div>
+            )}
+
+            {drawerState.mode === 'history' && (
+                <div className="history-panel">
+                    {sessions.length === 0 ? (
+                        <div className="empty-history">No history yet. Start creating!</div>
+                    ) : (
+                        <div className="history-list">
+                            {sessions.slice().reverse().map((sess, i) => {
+                                const originalIndex = sessions.length - 1 - i;
+                                return (
+                                    <div key={sess.id} className={`history-item ${originalIndex === currentSessionIndex ? 'active' : ''}`} onClick={() => jumpToSession(originalIndex)}>
+                                        <div className="history-item-content">
+                                            <div className="history-prompt">{sess.prompt}</div>
+                                            <div className="history-meta">{new Date(sess.timestamp).toLocaleTimeString()}</div>
+                                        </div>
+                                        <button className="delete-session-btn" onClick={(e) => handleDeleteSession(sess.id, e)}><TrashIcon /></button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
             )}
             
             {drawerState.mode === 'settings' && (
                 <div className="settings-panel">
                     <div className="setting-group">
                         <label>CSS Framework</label>
-                        <select 
-                            value={settings.framework} 
-                            onChange={(e) => setSettings(s => ({...s, framework: e.target.value as any}))}
-                        >
+                        <select value={settings.framework} onChange={(e) => setSettings(s => ({...s, framework: e.target.value as any}))}>
                             <option value="vanilla">Vanilla CSS</option>
                             <option value="tailwind">Tailwind CSS (CDN)</option>
                             <option value="react-mui">React + Material UI (CDN)</option>
                             <option value="bootstrap">Bootstrap 5 (CDN)</option>
                             <option value="foundation">Foundation 6 (CDN)</option>
                         </select>
-                        <p className="setting-desc">Determines the tech stack for generated components.</p>
                     </div>
                     <div className="setting-group">
-                        <label>Dynamic Data Context</label>
-                        <textarea 
-                            value={settings.dataContext} 
-                            onChange={(e) => setSettings(s => ({...s, dataContext: e.target.value}))}
-                            placeholder='e.g. { "users": ["Alice", "Bob"], "status": "active" }'
-                            rows={4}
-                        />
-                        <p className="setting-desc">Provide JSON or a description to populate components with specific data.</p>
+                        <label>Data Context</label>
+                        <textarea value={settings.dataContext} onChange={(e) => setSettings(s => ({...s, dataContext: e.target.value}))} placeholder='e.g. JSON data description' rows={4} />
                     </div>
-                    <div className="setting-group" style={{marginTop: '20px', borderTop: '1px solid #333', paddingTop: '20px'}}>
-                        <label style={{color: '#fca5a5'}}>Danger Zone</label>
-                        <button 
-                            onClick={handleClearHistory}
-                            style={{
-                                background: 'rgba(220, 38, 38, 0.1)',
-                                color: '#fca5a5',
-                                border: '1px solid rgba(220, 38, 38, 0.3)',
-                                padding: '10px',
-                                borderRadius: '6px',
-                                cursor: 'pointer',
-                                marginTop: '8px'
-                            }}
-                        >
-                            Clear All History
-                        </button>
+                    <div className="setting-group danger-zone">
+                        <label>Danger Zone</label>
+                        <button onClick={() => setIsConfirmingClear(true)} className="clear-history-btn">Clear All History</button>
                     </div>
                 </div>
             )}
@@ -688,61 +700,41 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
                 <div className="enhance-panel">
                     <button className="enhance-option" onClick={() => handleEnhance('a11y')}>
                         <span className="icon">♿</span>
-                        <div className="text">
-                            <strong>Accessibility Fix</strong>
-                            <span>Auto-correct ARIA labels, contrast, and semantics.</span>
-                        </div>
+                        <div className="text"><strong>Fix Accessibility</strong><span>ARIA labels, contrast & semantic tags.</span></div>
                     </button>
-                    <button className="enhance-option" onClick={() => handleEnhance('format')}>
-                        <span className="icon">📝</span>
-                        <div className="text">
-                            <strong>Format & Lint</strong>
-                            <span>Clean up code using Prettier standards.</span>
-                        </div>
+                    <button className="enhance-option" onClick={() => handleEnhance('responsive')}>
+                        <span className="icon">📱</span>
+                        <div className="text"><strong>Responsive Fix</strong><span>Media queries & layout flex.</span></div>
                     </button>
                     <button className="enhance-option" onClick={() => handleEnhance('dummy')}>
                         <span className="icon">🎲</span>
-                        <div className="text">
-                            <strong>Inject Dummy Data</strong>
-                            <span>Populate with realistic placeholder content.</span>
-                        </div>
+                        <div className="text"><strong>Inject Dummy Data</strong><span>Realistic names, text, & images.</span></div>
+                    </button>
+                    <button className="enhance-option" onClick={() => handleEnhance('tailwind')}>
+                        <span className="icon">🌊</span>
+                        <div className="text"><strong>Convert to Tailwind</strong><span>Clean utility classes.</span></div>
+                    </button>
+                    <button className="enhance-option" onClick={() => handleEnhance('format')}>
+                        <span className="icon">📝</span>
+                        <div className="text"><strong>Format Code</strong><span>Clean formatting & indentation.</span></div>
                     </button>
                 </div>
             )}
             
-            {drawerState.mode === 'code' && (
-                <CodeEditor 
-                    initialValue={drawerState.data} 
-                    onSave={updateArtifactCode} 
-                />
-            )}
+            {drawerState.mode === 'code' && <CodeEditor initialValue={drawerState.data} onSave={updateArtifactCode} />}
             
             {drawerState.mode === 'variations' && (
                 <div className="sexy-grid">
                     {componentVariations.map((v, i) => (
                          <div key={i} className="sexy-card" onClick={() => applyVariation(v.html)}>
-                             <button 
-                                className="expand-btn" 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setPreviewItem(v);
-                                }}
-                                title="Expand Preview"
-                             >
-                                 <ExpandIcon />
-                             </button>
-                             <div className="sexy-preview"><iframe srcDoc={v.html} title={v.name} /></div>
+                             <button className="expand-btn" onClick={(e) => { e.stopPropagation(); setPreviewItem(v); }}><ExpandIcon /></button>
+                             <div className="sexy-preview"><iframe srcDoc={v.html} title={v.name} loading="lazy" /></div>
                              <div className="sexy-label">{v.name}</div>
                          </div>
                     ))}
                     {componentVariations.length > 0 && (
-                        <button 
-                            className="load-more-btn" 
-                            onClick={handleLoadMoreVariations} 
-                            disabled={isLoading || componentVariations.length >= 6}
-                        >
-                            {isLoading ? <ThinkingIcon /> : <SparklesIcon />}
-                            {isLoading ? "Generating..." : (componentVariations.length >= 6 ? "Max limit reached" : "Generate More")}
+                        <button className="load-more-btn" onClick={handleLoadMoreVariations} disabled={isLoading || componentVariations.length >= 6}>
+                            {isLoading ? <ThinkingIcon /> : <SparklesIcon />} {isLoading ? "Generating..." : "Generate More"}
                         </button>
                     )}
                 </div>
@@ -750,21 +742,19 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
             
             {drawerState.mode === 'layouts' && (
                 <div className="sexy-grid">
-                    {LAYOUT_OPTIONS.map((lo, i) => (
-                        <div key={i} className="sexy-card" onClick={() => applyLayout(lo)}>
-                            <button 
-                                className="expand-btn" 
-                                onClick={(e) => handlePreviewLayout(e, lo)}
-                                title="Preview with current content"
-                            >
-                                <ExpandIcon />
-                            </button>
-                            <div className="sexy-preview">
-                                <div className="preview-container-inner" dangerouslySetInnerHTML={{ __html: lo.previewHtml }} />
+                    {LAYOUT_OPTIONS.map((lo, i) => {
+                        const baseHtml = focusedArtifact ? (focusedArtifact.originalHtml || focusedArtifact.html) : lo.previewHtml;
+                        const previewHtml = lo.name === "Standard" ? baseHtml : `<style>${lo.css}</style><div class="layout-container">${baseHtml}</div>`;
+                        return (
+                            <div key={i} className="sexy-card" onClick={() => applyLayout(lo)}>
+                                <button className="expand-btn" onClick={(e) => handlePreviewLayout(e, lo)}><ExpandIcon /></button>
+                                <div className="sexy-preview">
+                                    <iframe srcDoc={previewHtml} title={lo.name} loading="lazy" />
+                                </div>
+                                <div className="sexy-label">{lo.name}</div>
                             </div>
-                            <div className="sexy-label">{lo.name}</div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </SideDrawer>
@@ -793,19 +783,29 @@ Return ONLY a raw JSON array of 3 creative names (e.g. ["Neo-Brutalist Grid", "G
             </div>
              {canGoBack && <button className="nav-handle left" onClick={prevItem}><ArrowLeftIcon /></button>}
              {canGoForward && <button className="nav-handle right" onClick={nextItem}><ArrowRightIcon /></button>}
+            
             <div className={`action-bar ${focusedArtifactIndex !== null ? 'visible' : ''}`}>
+                 <div className="iteration-chat-container">
+                    <div className={`iteration-wrapper ${isLoading ? 'loading' : ''}`}>
+                        <input ref={iterationInputRef} type="text" placeholder="Refine this component..." value={iterationInput} onChange={handleIterationInputChange} onKeyDown={handleIterationKeyDown} disabled={isLoading} />
+                        <button className="iteration-send-btn" onClick={handleIterate} disabled={isLoading || !iterationInput.trim()}>
+                            {isLoading ? <ThinkingIcon /> : <ArrowUpIcon />}
+                        </button>
+                    </div>
+                 </div>
                  <div className="active-prompt-label">{currentSession?.prompt}</div>
                  <div className="action-buttons">
                     <button onClick={() => setFocusedArtifactIndex(null)}><GridIcon /> Grid</button>
                     <button onClick={handleShowEnhance}><WandIcon /> Enhance</button>
-                    <button onClick={handleGenerateVariations} disabled={isLoading} title="Generate design variations"><SparklesIcon /> Variations</button>
+                    <button className="variations-btn-pulse" onClick={handleGenerateVariations} disabled={isLoading} title="Generate design variations of this focused component"><SparklesIcon /> Variations</button>
                     <button onClick={handleShowLayouts}><LayoutIcon /> Layouts</button>
                     <button onClick={handleShowCode}><CodeIcon /> Code</button>
                     <button onClick={handleCopyCode}><CopyIcon /> {copyButtonText}</button>
                     <button onClick={handleDownload}><DownloadIcon /> Save</button>
                  </div>
             </div>
-            <div className="floating-input-container">
+
+            <div className={`floating-input-container ${focusedArtifactIndex !== null ? 'hidden' : ''}`}>
                 <div className={`input-wrapper ${isLoading ? 'loading' : ''}`}>
                     {!inputValue && !isLoading && (
                         <div className="animated-placeholder" key={placeholderIndex}>
