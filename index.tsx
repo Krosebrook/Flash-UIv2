@@ -12,14 +12,25 @@ import ReactDOM from 'react-dom/client';
 
 import { Artifact, Session, ComponentVariation, LayoutOption, GenerationSettings } from './types';
 import { INITIAL_PLACEHOLDERS, LAYOUT_OPTIONS } from './constants';
-import { generateId } from './utils';
+import { generateId, parseJsonStream } from './utils';
 import { useHistory } from './hooks/useHistory';
 import { loadSessions, saveSessions, clearSessions } from './utils/storage';
 
+// Components
 import DottedGlowBackground from './components/DottedGlowBackground';
 import ArtifactCard from './components/ArtifactCard';
 import SideDrawer from './components/SideDrawer';
 import CodeEditor from './components/CodeEditor';
+import ConfirmationModal from './components/ConfirmationModal';
+import PreviewModal from './components/PreviewModal';
+
+// Drawer Panels
+import HistoryPanel from './components/drawer/HistoryPanel';
+import SettingsPanel from './components/drawer/SettingsPanel';
+import EnhancePanel from './components/drawer/EnhancePanel';
+import VariationsPanel from './components/drawer/VariationsPanel';
+import LayoutsPanel from './components/drawer/LayoutsPanel';
+
 import { 
     ThinkingIcon, 
     CodeIcon, 
@@ -30,51 +41,13 @@ import {
     GridIcon,
     LayoutIcon,
     DownloadIcon,
-    ExpandIcon,
-    CloseIcon,
+    CopyIcon,
+    HistoryIcon,
     UndoIcon,
     RedoIcon,
     SettingsIcon,
-    WandIcon,
-    CopyIcon,
-    HistoryIcon,
-    TrashIcon
+    WandIcon
 } from './components/Icons';
-
-const parseJsonStream = async function* (responseStream: AsyncGenerator<{ text: string }>) {
-    let buffer = '';
-    for await (const chunk of responseStream) {
-        const text = chunk.text;
-        if (typeof text !== 'string') continue;
-        buffer += text;
-        let braceCount = 0;
-        let start = buffer.indexOf('{');
-        while (start !== -1) {
-            braceCount = 0;
-            let end = -1;
-            for (let i = start; i < buffer.length; i++) {
-                if (buffer[i] === '{') braceCount++;
-                else if (buffer[i] === '}') braceCount--;
-                if (braceCount === 0 && i > start) {
-                    end = i;
-                    break;
-                }
-            }
-            if (end !== -1) {
-                const jsonString = buffer.substring(start, end + 1);
-                try {
-                    yield JSON.parse(jsonString);
-                    buffer = buffer.substring(end + 1);
-                    start = buffer.indexOf('{');
-                } catch (e) {
-                    start = buffer.indexOf('{', start + 1);
-                }
-            } else {
-                break; 
-            }
-        }
-    }
-};
 
 function App() {
   const { 
@@ -96,7 +69,7 @@ function App() {
   const [iterationInput, setIterationInput] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [placeholders, setPlaceholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
+  const [placeholders] = useState<string[]>(INITIAL_PLACEHOLDERS);
   const [isConfirmingClear, setIsConfirmingClear] = useState(false);
   
   const [settings, setSettings] = useState<GenerationSettings>({
@@ -120,6 +93,8 @@ function App() {
   const inputRef = useRef<HTMLInputElement>(null);
   const iterationInputRef = useRef<HTMLInputElement>(null);
   const gridScrollRef = useRef<HTMLDivElement>(null);
+
+  // --- Effects ---
 
   useEffect(() => {
       const handler = setTimeout(() => {
@@ -152,12 +127,20 @@ function App() {
       return () => clearInterval(interval);
   }, [placeholders.length]);
 
+  // --- Handlers ---
+
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(event.target.value);
   };
 
   const handleIterationInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setIterationInput(event.target.value);
+  };
+
+  const getAiClient = () => {
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("API_KEY is not configured.");
+      return new GoogleGenAI({ apiKey });
   };
 
   const fetchVariations = useCallback(async (append: boolean) => {
@@ -176,9 +159,7 @@ function App() {
     }
 
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API_KEY is not configured.");
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = getAiClient();
 
         let frameworkInstruction = '';
         if (settings.framework === 'tailwind') frameworkInstruction = 'Use Tailwind CSS via CDN.';
@@ -306,17 +287,14 @@ Required JSON Output Format (stream ONE object per line):
     setDrawerState(s => ({ ...s, isOpen: false }));
     
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API_KEY missing");
-        const ai = new GoogleGenAI({ apiKey });
-        
+        const ai = getAiClient();
         const currentSession = sessions[currentSessionIndex];
         const artifact = currentSession.artifacts[focusedArtifactIndex];
         
         let enhancementPrompt = '';
         if (type === 'a11y') enhancementPrompt = 'Analyze the following HTML and fix any accessibility issues (ARIA labels, contrast, semantic tags). Ensure it meets WCAG standards for high accessibility. Return only the corrected HTML.';
         if (type === 'format') enhancementPrompt = 'Format the following code to be clean, indented, and compliant with Prettier standards. Return only the code.';
-        if (type === 'dummy') enhancementPrompt = 'Inject realistic, high-quality placeholder data (real names, detailed descriptions, high-quality images from Unsplash, etc.) into this component. Make it look like a real production app. Return only the HTML.';
+        if (type === 'dummy') enhancementPrompt = 'Inject realistic, high-quality placeholder data into this component. Use real-sounding names, detailed descriptions, and high-quality images from Unsplash (use valid https://images.unsplash.com URLs). Make it look like a real production app. Return only the HTML.';
         if (type === 'responsive') enhancementPrompt = 'Make this component perfectly responsive across mobile, tablet, and desktop. Add media queries or responsive classes if missing. Return only the HTML.';
         if (type === 'tailwind') enhancementPrompt = 'Refactor this component to use Tailwind CSS utility classes exclusively for all styling. Replace existing CSS. Return only the HTML.';
 
@@ -351,9 +329,7 @@ Required JSON Output Format (stream ONE object per line):
       setIsLoading(true);
 
       try {
-          const apiKey = process.env.API_KEY;
-          if (!apiKey) throw new Error("API_KEY missing");
-          const ai = new GoogleGenAI({ apiKey });
+          const ai = getAiClient();
           const currentSession = sessions[currentSessionIndex];
           const artifact = currentSession.artifacts[focusedArtifactIndex];
 
@@ -425,6 +401,8 @@ Instructions:
       });
   };
 
+  // --- Drawer Openers ---
+
   const handleShowCode = () => {
       const currentSession = sessions[currentSessionIndex];
       if (currentSession && focusedArtifactIndex !== null) {
@@ -433,21 +411,10 @@ Instructions:
       }
   };
 
-  const handleShowLayouts = () => {
-    setDrawerState({ isOpen: true, mode: 'layouts', title: 'Layout Options', data: null, error: null });
-  };
-  
-  const handleShowSettings = () => {
-      setDrawerState({ isOpen: true, mode: 'settings', title: 'Configuration', data: null, error: null });
-  };
-  
-  const handleShowEnhance = () => {
-      setDrawerState({ isOpen: true, mode: 'enhance', title: 'Enhance Code', data: null, error: null });
-  };
-
-  const handleShowHistory = () => {
-      setDrawerState({ isOpen: true, mode: 'history', title: 'Recent Generations', data: null, error: null });
-  };
+  const handleShowLayouts = () => setDrawerState({ isOpen: true, mode: 'layouts', title: 'Layout Options', data: null, error: null });
+  const handleShowSettings = () => setDrawerState({ isOpen: true, mode: 'settings', title: 'Configuration', data: null, error: null });
+  const handleShowEnhance = () => setDrawerState({ isOpen: true, mode: 'enhance', title: 'Enhance Code', data: null, error: null });
+  const handleShowHistory = () => setDrawerState({ isOpen: true, mode: 'history', title: 'Recent Generations', data: null, error: null });
 
   const handleDownload = () => {
     if (focusedArtifactIndex === null || currentSessionIndex === -1) return;
@@ -501,9 +468,7 @@ Instructions:
     setFocusedArtifactIndex(null); 
 
     try {
-        const apiKey = process.env.API_KEY;
-        if (!apiKey) throw new Error("API_KEY missing");
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = getAiClient();
 
         let frameworkContext = "";
         if (settings.framework === 'tailwind') frameworkContext = " Use Tailwind CSS via CDN.";
@@ -602,32 +567,20 @@ Instructions:
 
   return (
     <>
-        {isConfirmingClear && (
-            <div className="confirmation-modal-overlay">
-                <div className="confirmation-modal">
-                    <h3>Clear All History?</h3>
-                    <p>This will permanently delete all your generated sessions and artifacts. This action cannot be undone.</p>
-                    <div className="confirmation-actions">
-                        <button className="confirm-cancel" onClick={() => setIsConfirmingClear(false)}>Cancel</button>
-                        <button className="confirm-destructive" onClick={confirmClearHistory}>Delete Everything</button>
-                    </div>
-                </div>
-            </div>
-        )}
+        <ConfirmationModal
+            isOpen={isConfirmingClear}
+            title="Clear All History?"
+            message="This will permanently delete all your generated sessions and artifacts. This action cannot be undone."
+            confirmText="Delete Everything"
+            cancelText="Cancel"
+            onConfirm={confirmClearHistory}
+            onCancel={() => setIsConfirmingClear(false)}
+        />
 
-        {previewItem && (
-            <div className="preview-overlay">
-                <div className="preview-modal">
-                    <div className="preview-header">
-                        <h3>{previewItem.name}</h3>
-                        <button onClick={() => setPreviewItem(null)} className="close-preview-button"><CloseIcon /></button>
-                    </div>
-                    <div className="preview-content">
-                        <iframe srcDoc={previewItem.html} title="Preview" />
-                    </div>
-                </div>
-            </div>
-        )}
+        <PreviewModal
+            item={previewItem}
+            onClose={() => setPreviewItem(null)}
+        />
 
         <div className="global-controls">
             <button className="icon-btn" onClick={handleShowHistory} title="History"><HistoryIcon /></button>
@@ -646,116 +599,48 @@ Instructions:
         >
             {drawerState.error && <div className="drawer-error">{drawerState.error}</div>}
             
-            {isLoading && drawerState.mode === 'variations' && !drawerState.error && componentVariations.length === 0 && (
-                <div className="loading-state"><ThinkingIcon /> Designing...</div>
-            )}
-
             {drawerState.mode === 'history' && (
-                <div className="history-panel">
-                    {sessions.length === 0 ? (
-                        <div className="empty-history">No history yet. Start creating!</div>
-                    ) : (
-                        <div className="history-list">
-                            {sessions.slice().reverse().map((sess, i) => {
-                                const originalIndex = sessions.length - 1 - i;
-                                return (
-                                    <div key={sess.id} className={`history-item ${originalIndex === currentSessionIndex ? 'active' : ''}`} onClick={() => jumpToSession(originalIndex)}>
-                                        <div className="history-item-content">
-                                            <div className="history-prompt">{sess.prompt}</div>
-                                            <div className="history-meta">{new Date(sess.timestamp).toLocaleTimeString()}</div>
-                                        </div>
-                                        <button className="delete-session-btn" onClick={(e) => handleDeleteSession(sess.id, e)}><TrashIcon /></button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
+                <HistoryPanel 
+                    sessions={sessions}
+                    currentSessionIndex={currentSessionIndex}
+                    onJumpToSession={jumpToSession}
+                    onDeleteSession={handleDeleteSession}
+                />
             )}
             
             {drawerState.mode === 'settings' && (
-                <div className="settings-panel">
-                    <div className="setting-group">
-                        <label>CSS Framework</label>
-                        <select value={settings.framework} onChange={(e) => setSettings(s => ({...s, framework: e.target.value as any}))}>
-                            <option value="vanilla">Vanilla CSS</option>
-                            <option value="tailwind">Tailwind CSS (CDN)</option>
-                            <option value="react-mui">React + Material UI (CDN)</option>
-                            <option value="bootstrap">Bootstrap 5 (CDN)</option>
-                            <option value="foundation">Foundation 6 (CDN)</option>
-                        </select>
-                    </div>
-                    <div className="setting-group">
-                        <label>Data Context</label>
-                        <textarea value={settings.dataContext} onChange={(e) => setSettings(s => ({...s, dataContext: e.target.value}))} placeholder='e.g. JSON data description' rows={4} />
-                    </div>
-                    <div className="setting-group danger-zone">
-                        <label>Danger Zone</label>
-                        <button onClick={() => setIsConfirmingClear(true)} className="clear-history-btn">Clear All History</button>
-                    </div>
-                </div>
+                <SettingsPanel 
+                    settings={settings}
+                    onSettingsChange={setSettings}
+                    onClearHistoryRequest={() => setIsConfirmingClear(true)}
+                />
             )}
 
             {drawerState.mode === 'enhance' && (
-                <div className="enhance-panel">
-                    <button className="enhance-option" onClick={() => handleEnhance('a11y')}>
-                        <span className="icon">♿</span>
-                        <div className="text"><strong>Fix Accessibility</strong><span>ARIA labels, contrast & semantic tags.</span></div>
-                    </button>
-                    <button className="enhance-option" onClick={() => handleEnhance('responsive')}>
-                        <span className="icon">📱</span>
-                        <div className="text"><strong>Responsive Fix</strong><span>Media queries & layout flex.</span></div>
-                    </button>
-                    <button className="enhance-option" onClick={() => handleEnhance('dummy')}>
-                        <span className="icon">🎲</span>
-                        <div className="text"><strong>Inject Dummy Data</strong><span>Realistic names, text, & images.</span></div>
-                    </button>
-                    <button className="enhance-option" onClick={() => handleEnhance('tailwind')}>
-                        <span className="icon">🌊</span>
-                        <div className="text"><strong>Convert to Tailwind</strong><span>Clean utility classes.</span></div>
-                    </button>
-                    <button className="enhance-option" onClick={() => handleEnhance('format')}>
-                        <span className="icon">📝</span>
-                        <div className="text"><strong>Format Code</strong><span>Clean formatting & indentation.</span></div>
-                    </button>
-                </div>
+                <EnhancePanel onEnhance={handleEnhance} />
             )}
             
-            {drawerState.mode === 'code' && <CodeEditor initialValue={drawerState.data} onSave={updateArtifactCode} />}
+            {drawerState.mode === 'code' && (
+                <CodeEditor initialValue={drawerState.data} onSave={updateArtifactCode} />
+            )}
             
             {drawerState.mode === 'variations' && (
-                <div className="sexy-grid">
-                    {componentVariations.map((v, i) => (
-                         <div key={i} className="sexy-card" onClick={() => applyVariation(v.html)}>
-                             <button className="expand-btn" onClick={(e) => { e.stopPropagation(); setPreviewItem(v); }}><ExpandIcon /></button>
-                             <div className="sexy-preview"><iframe srcDoc={v.html} title={v.name} loading="lazy" /></div>
-                             <div className="sexy-label">{v.name}</div>
-                         </div>
-                    ))}
-                    {componentVariations.length > 0 && (
-                        <button className="load-more-btn" onClick={handleLoadMoreVariations} disabled={isLoading || componentVariations.length >= 6}>
-                            {isLoading ? <ThinkingIcon /> : <SparklesIcon />} {isLoading ? "Generating..." : "Generate More"}
-                        </button>
-                    )}
-                </div>
+                <VariationsPanel 
+                    variations={componentVariations}
+                    isLoading={isLoading}
+                    onApply={applyVariation}
+                    onPreview={setPreviewItem}
+                    onLoadMore={handleLoadMoreVariations}
+                />
             )}
             
             {drawerState.mode === 'layouts' && (
-                <div className="sexy-grid">
-                    {LAYOUT_OPTIONS.map((lo, i) => {
-                        const baseHtml = focusedArtifact ? (focusedArtifact.originalHtml || focusedArtifact.html) : lo.previewHtml;
-                        const previewHtml = lo.name === "Standard" ? baseHtml : `<style>${lo.css}</style><div class="layout-container">${baseHtml}</div>`;
-                        return (
-                            <div key={i} className="sexy-card" onClick={() => applyLayout(lo)}>
-                                <button className="expand-btn" onClick={(e) => handlePreviewLayout(e, lo)}><ExpandIcon /></button>
-                                <div className="sexy-preview">
-                                    <iframe srcDoc={previewHtml} title={lo.name} loading="lazy" />
-                                </div>
-                                <div className="sexy-label">{lo.name}</div>
-                            </div>
-                        );
-                    })}
-                </div>
+                <LayoutsPanel 
+                    layouts={LAYOUT_OPTIONS}
+                    focusedArtifact={focusedArtifact}
+                    onApply={applyLayout}
+                    onPreview={handlePreviewLayout}
+                />
             )}
         </SideDrawer>
 
