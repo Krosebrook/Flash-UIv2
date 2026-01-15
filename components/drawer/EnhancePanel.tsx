@@ -1,4 +1,3 @@
-
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -17,7 +16,7 @@ const EnhancePanel: React.FC<EnhancePanelProps> = ({ onEnhance }) => {
         <div className="enhance-panel">
             <button className="enhance-option" onClick={() => onEnhance('a11y')}>
                 <span className="icon">♿</span>
-                <div className="text"><strong>Fix Accessibility</strong><span>ARIA labels, contrast & semantic tags.</span></div>
+                <div className="text"><strong>Fix Accessibility</strong><span>ARIA, contrast & WCAG standards.</span></div>
             </button>
             <button className="enhance-option" onClick={() => onEnhance('responsive')}>
                 <span className="icon">📱</span>
@@ -33,7 +32,7 @@ const EnhancePanel: React.FC<EnhancePanelProps> = ({ onEnhance }) => {
             </button>
             <button className="enhance-option" onClick={() => onEnhance('format')}>
                 <span className="icon">📝</span>
-                <div className="text"><strong>Format Code</strong><span>Clean formatting & indentation.</span></div>
+                <div className="text"><strong>Prettify Code</strong><span>Clean formatting & indentation.</span></div>
             </button>
         </div>
     );
